@@ -1,0 +1,220 @@
+--[========================================================]
+-- Script Owner: JOHNBERT
+-- Experience: Steal An Egg
+-- UI Theme: Classic Server List (1 Player Filter + Join Buttons)
+-- Handles: wallopcocong0 / 09donperds11
+--[========================================================]
+
+local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Tangtangon ang daan kung naa man gani
+if CoreGui:FindFirstChild("StealAnEggServerListUI") then
+    CoreGui.StealAnEggServerListUI:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "StealAnEggServerListUI"
+ScreenGui.Parent = CoreGui
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Main Classic Frame (Gamay ug Compact)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderColor3 = Color3.fromRGB(80, 80, 80)
+MainFrame.BorderSizePixel = 1
+MainFrame.Position = UDim2.new(0.5, -135, 0.5, -110)
+MainFrame.Size = UDim2.new(0, 270, 0, 220)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+-- Classic Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Parent = MainFrame
+TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TitleBar.BorderColor3 = Color3.fromRGB(80, 80, 80)
+TitleBar.BorderSizePixel = 1
+TitleBar.Size = UDim2.new(1, 0, 0, 25)
+
+local TitleText = Instance.new("TextLabel")
+TitleText.Parent = TitleBar
+TitleText.BackgroundTransparency = 1
+TitleText.Position = UDim2.new(0, 8, 0, 0)
+TitleText.Size = UDim2.new(0, 200, 1, 0)
+TitleText.Font = Enum.Font.SourceSansBold
+TitleText.Text = "Steal An Egg [1-Player Servers]"
+TitleText.TextColor3 = Color3.fromRGB(240, 240, 240)
+TitleText.TextSize = 13
+TitleText.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Classic Minimize Button (-)
+local HideBtn = Instance.new("TextButton")
+HideBtn.Parent = TitleBar
+HideBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+HideBtn.BorderColor3 = Color3.fromRGB(100, 100, 100)
+HideBtn.Position = UDim2.new(1, -22, 0, 3)
+HideBtn.Size = UDim2.new(0, 18, 0, 18)
+HideBtn.Font = Enum.Font.SourceSansBold
+HideBtn.Text = "-"
+HideBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+HideBtn.TextSize = 14
+
+-- Floating Open Button (Makita kung i-hide ang UI)
+local OpenBtn = Instance.new("TextButton")
+OpenBtn.Name = "OpenButton"
+OpenBtn.Parent = ScreenGui
+OpenBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+OpenBtn.BorderColor3 = Color3.fromRGB(80, 80, 80)
+OpenBtn.Position = UDim2.new(0, 10, 0.5, -15)
+OpenBtn.Size = UDim2.new(0, 35, 0, 35)
+OpenBtn.Font = Enum.Font.SourceSansBold
+OpenBtn.Text = "UI"
+OpenBtn.TextColor3 = Color3.fromRGB(0, 255, 128)
+OpenBtn.TextSize = 12
+OpenBtn.Visible = false
+
+-- Content Container
+local Content = Instance.new("Frame")
+Content.Parent = MainFrame
+Content.BackgroundTransparency = 1
+Content.Position = UDim2.new(0, 8, 0, 32)
+Content.Size = UDim2.new(1, -16, 1, -40)
+
+-- Status / Scan Button Frame
+local TopActionFrame = Instance.new("Frame")
+TopActionFrame.Parent = Content
+TopActionFrame.BackgroundTransparency = 1
+TopActionFrame.Size = UDim2.new(1, 0, 0, 25)
+
+local ScanButton = Instance.new("TextButton")
+ScanButton.Parent = TopActionFrame
+ScanButton.BackgroundColor3 = Color3.fromRGB(0, 120, 80)
+ScanButton.BorderColor3 = Color3.fromRGB(0, 160, 100)
+ScanButton.Size = UDim2.new(1, 0, 1, 0)
+ScanButton.Font = Enum.Font.SourceSansBold
+ScanButton.Text = "Scan 1-Player Servers"
+ScanButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ScanButton.TextSize = 12
+
+-- Scrolling List for Servers
+local ServerScroll = Instance.new("ScrollingFrame")
+ServerScroll.Parent = Content
+ServerScroll.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+ServerScroll.BorderColor3 = Color3.fromRGB(60, 60, 60)
+ServerScroll.Position = UDim2.new(0, 0, 0, 30)
+ServerScroll.Size = UDim2.new(1, 0, 1, -30)
+ServerScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+ServerScroll.ScrollBarThickness = 4
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = ServerScroll
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 4)
+
+-- Function para limpyohan ang daan nga listahan
+local function ClearList()
+    for _, child in ipairs(ServerScroll:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+end
+
+-- Function para mangita ug magbutang sa mga server nga 1 ra ang tawo sa listahan
+local function ScanServers()
+    ScanButton.Text = "Scanning servers..."
+    ClearList()
+    
+    local cursor = ""
+    local foundCount = 0
+
+    for i = 1, 3 do -- Limitado sa pipila ka pages aron dili malowow
+        local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+        if cursor ~= "" then
+            url = url .. "&cursor=" .. cursor
+        end
+
+        local success, result = pcall(function()
+            return HttpService:JSONDecode(game:HttpGet(url))
+        end)
+
+        if success and result and result.data then
+            for _, server in ipairs(result.data) do
+                -- Kung 1 ra ang nagdula ug dili ang current server
+                if server.playing == 1 and server.id ~= game.JobId then
+                    foundCount = foundCount + 1
+
+                    -- Server Item Row
+                    local ItemFrame = Instance.new("Frame")
+                    ItemFrame.Parent = ServerScroll
+                    ItemFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+                    ItemFrame.BorderColor3 = Color3.fromRGB(70, 70, 70)
+                    ItemFrame.Size = UDim2.new(1, -6, 0, 28)
+
+                    -- Server Info Label (Ping / ID snippet)
+                    local InfoLabel = Instance.new("TextLabel")
+                    InfoLabel.Parent = ItemFrame
+                    InfoLabel.BackgroundTransparency = 1
+                    InfoLabel.Position = UDim2.new(0, 6, 0, 0)
+                    InfoLabel.Size = UDim2.new(0, 150, 1, 0)
+                    InfoLabel.Font = Enum.Font.SourceSans
+                    InfoLabel.Text = "Player: 1 | Ping: " .. (server.ping or "N/A")
+                    InfoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+                    InfoLabel.TextSize = 11
+                    InfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+                    -- Join Button sa Kilid
+                    local JoinBtn = Instance.new("TextButton")
+                    JoinBtn.Parent = ItemFrame
+                    JoinBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 160)
+                    JoinBtn.BorderColor3 = Color3.fromRGB(0, 130, 200)
+                    JoinBtn.Position = UDim2.new(1, -70, 0, 3)
+                    JoinBtn.Size = UDim2.new(0, 65, 1, -6)
+                    JoinBtn.Font = Enum.Font.SourceSansBold
+                    JoinBtn.Text = "JOIN"
+                    JoinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    JoinBtn.TextSize = 11
+
+                    local serverId = server.id
+                    JoinBtn.MouseButton1Click:Connect(function()
+                        JoinBtn.Text = "Joining..."
+                        TeleportService:TeleportToPlaceInstance(game.PlaceId, serverId, LocalPlayer)
+                    end)
+                end
+            end
+            cursor = result.nextPageCursor
+            if not cursor then break end
+        else
+            break
+        end
+        task.wait(0.1)
+    end
+
+    ServerScroll.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + 10)
+    if foundCount == 0 then
+        ScanButton.Text = "No 1-player server found. Rescan"
+    else
+        ScanButton.Text = "Scan Complete (" .. foundCount .. " found)"
+    end
+end
+
+-- Button Click Events
+ScanButton.MouseButton1Click:Connect(function()
+    task.spawn(ScanServers)
+end)
+
+HideBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+    OpenBtn.Visible = true
+end)
+
+OpenBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = true
+    OpenBtn.Visible = false
+end)
